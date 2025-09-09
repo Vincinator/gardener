@@ -316,6 +316,45 @@ spec:
                   gardener-node-agent already running on a bootstrapped VM.
                   This field is immutable.
                 type: string
+              swapConfiguration:
+                description: SwapConfig config is a structure that contains configurations
+                  of system swap
+                properties:
+                  fileSwap:
+                    description: FileSwap is a list of file based swap configurations
+                    items:
+                      description: FileSwapConfiguration configures file backed swap
+                        on a Kubernetes worker node
+                      properties:
+                        fileName:
+                          description: FileName is the name of a swap file
+                          type: string
+                        size:
+                          description: FileSize is the size of the swap file
+                          type: integer
+                      required:
+                      - size
+                      type: object
+                    type: array
+                  zramSwap:
+                    description: ZramSwap is a list of file zram swap configurations
+                    items:
+                      description: ZramSwapConfiguration configures zram backed swap
+                        on a Kubernetes worker node
+                      properties:
+                        algorithm:
+                          description: Algorithm specifies the compression algorithm
+                            for the zram backed swap device
+                          type: string
+                        size:
+                          description: Size is the size of the zram backed swap device
+                          type: integer
+                      required:
+                      - algorithm
+                      - size
+                      type: object
+                    type: array
+                type: object
               type:
                 description: Type contains the instance of the resource's kind.
                 type: string

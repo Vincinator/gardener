@@ -214,6 +214,8 @@ func computeOperatingSystemConfigChanges(log logr.Logger, fs afero.Afero, newOSC
 	}
 	changes.Containerd.Registries = computeContainerdRegistryDiffs(newRegistries, oldRegistries)
 
+	// compute changes in node swap configuration
+
 	changes.lock.Lock()
 	defer changes.lock.Unlock()
 	return changes, changes.persist()

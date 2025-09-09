@@ -72,6 +72,9 @@ type OperatingSystemConfigSpec struct {
 	// CRI config is a structure contains configurations of the CRI library
 	// +optional
 	CRIConfig *CRIConfig `json:"criConfig,omitempty"`
+	// SwapConfig config is a structure that contains configurations of system swap
+	// +optional
+	SwapConfig *SwapConfiguration `json:"swapConfiguration,omitempty"`
 	// Purpose describes how the result of this OperatingSystemConfig is used by Gardener. Either it
 	// gets sent to the `Worker` extension controller to bootstrap a VM, or it is downloaded by the
 	// gardener-node-agent already running on a bootstrapped VM.
@@ -90,6 +93,33 @@ type OperatingSystemConfigSpec struct {
 	// InPlaceUpdates contains the configuration for in-place updates.
 	// +optional
 	InPlaceUpdates *InPlaceUpdates `json:"inPlaceUpdates,omitempty"`
+}
+
+// SwapConfiguration is a structure for swap configuration
+type SwapConfiguration struct {
+	// FileSwap is a list of file based swap configurations
+	// +optional
+	FileSwap []FileSwapConfiguration `json:"fileSwap,omitempty"`
+	// ZramSwap is a list of file zram swap configurations
+	// +optional
+	ZramSwap []ZramSwapConfiguration `json:"zramSwap,omitempty"`
+}
+
+// FileSwapConfiguration configures file backed swap on a Kubernetes worker node
+type FileSwapConfiguration struct {
+	//FileSize is the size of the swap file
+	Size int `json:"size"`
+	//FileName is the name of a swap file
+	//+optional
+	FileName *string `json:"fileName,omitempty"`
+}
+
+// ZramSwapConfiguration configures zram backed swap on a Kubernetes worker node
+type ZramSwapConfiguration struct {
+	// Size is the size of the zram backed swap device
+	Size int `json:"size"`
+	// Algorithm specifies the compression algorithm for the zram backed swap device
+	Algorithm string `json:"algorithm"`
 }
 
 // Unit is a unit for the operating system configuration (usually, a systemd unit).

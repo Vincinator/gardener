@@ -27,6 +27,8 @@ type operatingSystemConfigChanges struct {
 	MustRestartNodeAgent          bool       `json:"mustRestartNodeAgent"`
 
 	InPlaceUpdates inPlaceUpdates `json:"inPlaceUpdates"`
+
+	SwapConfiguration *extensionsv1alpha1.SwapConfiguration `json:"swapConfiguration"`
 }
 
 type units struct {

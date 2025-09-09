@@ -1398,6 +1398,20 @@ CRIConfig
 </tr>
 <tr>
 <td>
+<code>swapConfiguration</code></br>
+<em>
+<a href="#extensions.gardener.cloud/v1alpha1.SwapConfiguration">
+SwapConfiguration
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>SwapConfig config is a structure that contains configurations of system swap</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>purpose</code></br>
 <em>
 <a href="#extensions.gardener.cloud/v1alpha1.OperatingSystemConfigPurpose">
@@ -3458,6 +3472,48 @@ string
 </tr>
 </tbody>
 </table>
+<h3 id="extensions.gardener.cloud/v1alpha1.FileSwapConfiguration">FileSwapConfiguration
+</h3>
+<p>
+(<em>Appears on:</em>
+<a href="#extensions.gardener.cloud/v1alpha1.SwapConfiguration">SwapConfiguration</a>)
+</p>
+<p>
+<p>FileSwapConfiguration configures file backed swap on a Kubernetes worker node</p>
+</p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>size</code></br>
+<em>
+int
+</em>
+</td>
+<td>
+<p>FileSize is the size of the swap file</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>fileName</code></br>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>FileName is the name of a swap file</p>
+</td>
+</tr>
+</tbody>
+</table>
 <h3 id="extensions.gardener.cloud/v1alpha1.IPFamily">IPFamily
 (<code>string</code> alias)</p></h3>
 <p>
@@ -4168,6 +4224,20 @@ CRIConfig
 </tr>
 <tr>
 <td>
+<code>swapConfiguration</code></br>
+<em>
+<a href="#extensions.gardener.cloud/v1alpha1.SwapConfiguration">
+SwapConfiguration
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>SwapConfig config is a structure that contains configurations of system swap</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>purpose</code></br>
 <em>
 <a href="#extensions.gardener.cloud/v1alpha1.OperatingSystemConfigPurpose">
@@ -4564,6 +4634,53 @@ Kubernetes meta/v1.Time
 <p>
 <p>Status is the status of an Object.</p>
 </p>
+<h3 id="extensions.gardener.cloud/v1alpha1.SwapConfiguration">SwapConfiguration
+</h3>
+<p>
+(<em>Appears on:</em>
+<a href="#extensions.gardener.cloud/v1alpha1.OperatingSystemConfigSpec">OperatingSystemConfigSpec</a>)
+</p>
+<p>
+<p>SwapConfiguration is a structure for swap configuration</p>
+</p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>fileSwap</code></br>
+<em>
+<a href="#extensions.gardener.cloud/v1alpha1.FileSwapConfiguration">
+[]FileSwapConfiguration
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>FileSwap is a list of file based swap configurations</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>zramSwap</code></br>
+<em>
+<a href="#extensions.gardener.cloud/v1alpha1.ZramSwapConfiguration">
+[]ZramSwapConfiguration
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>ZramSwap is a list of file zram swap configurations</p>
+</td>
+</tr>
+</tbody>
+</table>
 <h3 id="extensions.gardener.cloud/v1alpha1.Unit">Unit
 </h3>
 <p>
@@ -5246,6 +5363,47 @@ InPlaceUpdatesWorkerStatus
 <td>
 <em>(Optional)</em>
 <p>InPlaceUpdates contains the status for in-place updates.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="extensions.gardener.cloud/v1alpha1.ZramSwapConfiguration">ZramSwapConfiguration
+</h3>
+<p>
+(<em>Appears on:</em>
+<a href="#extensions.gardener.cloud/v1alpha1.SwapConfiguration">SwapConfiguration</a>)
+</p>
+<p>
+<p>ZramSwapConfiguration configures zram backed swap on a Kubernetes worker node</p>
+</p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>size</code></br>
+<em>
+int
+</em>
+</td>
+<td>
+<p>Size is the size of the zram backed swap device</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>algorithm</code></br>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Algorithm specifies the compression algorithm for the zram backed swap device</p>
 </td>
 </tr>
 </tbody>

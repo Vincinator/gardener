@@ -231,6 +231,11 @@ func (r *Reconciler) Reconcile(reconcileCtx context.Context, request reconcile.R
 		return reconcile.Result{}, fmt.Errorf("failed removing deleted units: %w", err)
 	}
 
+	log.Info("Applying node swap configuration")
+	if err := r.applySwapConfiguration(ctx, log, oscChanges); err != nil {
+		return reconcile.Result{}, fmt.Errorf("failed applying node swap configuration: %w", err)
+	}
+
 	log.Info("Reloading systemd daemon")
 	if err := r.DBus.DaemonReload(ctx); err != nil {
 		return reconcile.Result{}, fmt.Errorf("failed reloading systemd daemon: %w", err)
@@ -1089,4 +1094,19 @@ func (r *Reconciler) restartNodeAgent(oscChanges *operatingSystemConfigChanges, 
 	}
 	r.CancelContext()
 	return reconcile.Result{RequeueAfter: RequeueAfterRestart}, nil
+}
+
+func (r *Reconciler) applySwapConfiguration(ctx context.Context, log logr.Logger, oscChanges *operatingSystemConfigChanges) error {
+	for _, swapConfig := range oscChanges.SwapConfiguration.FileSwap {
+		// do what ever is necessary to enable file swap
+	}
+
+	for _, swapConfig := range oscChanges.SwapConfiguration.ZramSwap {
+		// do what ever is necessary to enable zram swap
+
+		if zramModuleLoadFailed {
+			return fmt.Errorf("failed to load zram module")
+		}
+	}
+	return nil
 }
