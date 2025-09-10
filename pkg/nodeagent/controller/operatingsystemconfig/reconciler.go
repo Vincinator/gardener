@@ -20,6 +20,8 @@ import (
 	"strings"
 	"time"
 
+  "golang.org/x/sys/unix"
+
 	machinev1alpha1 "github.com/gardener/machine-controller-manager/pkg/apis/machine/v1alpha1"
 	"github.com/go-logr/logr"
 	"github.com/spf13/afero"
@@ -31,6 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	jsonserializer "k8s.io/apimachinery/pkg/runtime/serializer/json"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/client-go/discovery/cached/disk"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	"k8s.io/client-go/tools/record"
@@ -1096,16 +1099,106 @@ func (r *Reconciler) restartNodeAgent(oscChanges *operatingSystemConfigChanges, 
 	return reconcile.Result{RequeueAfter: RequeueAfterRestart}, nil
 }
 
-func (r *Reconciler) applySwapConfiguration(ctx context.Context, log logr.Logger, oscChanges *operatingSystemConfigChanges) error {
-	for _, swapConfig := range oscChanges.SwapConfiguration.FileSwap {
-		// do what ever is necessary to enable file swap
+func (r *Reconciler) checkCompAlgSupport(ctx context.Context, log logr.Logger, compAlgorithm string, deviceNum int) bool {
+
+	cmdGetSupportedAlgorithms:= exec.CommandContext(ctx, "bash", "-c", fmt.Sprintf("cat /sys/block/zram%d/disksize", deviceNum))
+	
+	output, err := cmdGetSupportedAlgorithms.Output()
+	if err != nil {
+		log.Error(err,"failed to get supported compression algorithms for zram device")
+		return false
 	}
 
-	for _, swapConfig := range oscChanges.SwapConfiguration.ZramSwap {
-		// do what ever is necessary to enable zram swap
+	return strings.Contains(string(output), compAlgorithm)
+}
 
-		if zramModuleLoadFailed {
-			return fmt.Errorf("failed to load zram module")
+func (r* Reconciler) writeSysfsConfiguration(ctx context.Context, log logr.Logger, path string, value string) error {
+	
+	cmd := exec.CommandContext(ctx, "bash", "-c", fmt.Sprintf("echo %s > %s", value, path))
+
+	if err := cmd.Run(); err != nil {
+		log.Error(err, "failed to write sysfs configuration", "path", path, "value", value)
+		return err
+	}
+
+	return nil
+}
+
+
+func (r *Reconciler) getPhysicalMemorySize(ctx context.Context, log logr.Logger) (uint64, error) {
+	var info unix.Sysinfo_t
+	if err := unix.Sysinfo(&info); err != nil {
+        return 0, err
+    }
+    totalRAM := info.Totalram * uint64(info.Unit) / (1024 * 1024) // Convert to MiB
+    return totalRAM, nil
+}
+
+
+func (r *Reconciler) applySwapConfiguration(ctx context.Context, log logr.Logger, oscChanges *operatingSystemConfigChanges) error {
+	// for num, swapConfig := range oscChanges.SwapConfiguration.FileSwap {
+		//  e do what ever is necessary to enable file swap
+	// }
+
+	// https://www.kernel.org/doc/html/latest/admin-guide/blockdev/zram.html
+	if oscChanges.SwapConfiguration.ZramSwap != nil {
+		numDevices := len(oscChanges.SwapConfiguration.ZramSwap)
+		// load zram module via os/exec modprobe zram num_devices=
+		cmd := exec.CommandContext(ctx, "modprobe", "zram", fmt.Sprintf("num_devices=%d", numDevices))
+
+		if err := cmd.Run(); err != nil {
+			log.Error(err, "failed to load zram module for swap configuration")
+			return err
+		}
+
+		// configure zram devices
+		for num, swapConfig := range oscChanges.SwapConfiguration.ZramSwap {
+
+			diskSize := swapConfig.DiskSizeMib
+
+			if diskSize <= 0 {
+				return errors.New("invalid disk size for zram configuration. Disk size must be greater than 0")
+			}
+			
+			totalRAM, err := r.getPhysicalMemorySize(ctx, log)
+			if err != nil {
+				return errors.New("failed to get physical memory size")
+			}
+
+			if totalRAM > uint64(diskSize) * 2 {
+				return errors.New("DiskSize of zram is too large, no point in having zram twice the size of physical memory")
+			}
+
+			// Must always set disksize
+			r.writeSysfsConfiguration(ctx, log, fmt.Sprintf("/sys/block/zram%d/disksize", num), fmt.Sprintf("%dM", diskSize))
+
+			// optionally set Memory Limit for device 
+			if swapConfig.MemLimitMib != nil {
+				memLimitMib := *swapConfig.MemLimitMib
+				if memLimitMib <= 0 {
+					return errors.New("invalid memory limit for zram configuration. Memory limit must be greater than 0")
+
+				}
+				r.writeSysfsConfiguration(ctx, log, fmt.Sprintf("/sys/block/zram%d/mem_limit", num), fmt.Sprintf("%dM", memLimitMib))
+			}
+			
+			// optionally set compression algorithm
+			if swapConfig.CompAlgorithm != nil {
+				compAlgorithm := *swapConfig.CompAlgorithm
+				
+				if !r.checkCompAlgSupport(ctx, log, compAlgorithm, num) {
+					return errors.New("zram compression algorithm not supported by kernel")
+				}
+				r.writeSysfsConfiguration(ctx, log, fmt.Sprintf("/sys/block/zram%d/comp_algorithm", num), compAlgorithm)
+			}
+
+			if swapConfig.MaxCompStreams != nil {
+				maxCompStreams := *swapConfig.MaxCompStreams
+				if maxCompStreams <= 0 {
+					return errors.New("invalid max compression streams for zram configuration. Max compression streams must be greater than 0")
+				}
+				r.writeSysfsConfiguration(ctx, log, fmt.Sprintf("/sys/block/zram%d/max_comp_streams", num), fmt.Sprintf("%d", maxCompStreams))
+			}
 		}
 	}
 	return nil

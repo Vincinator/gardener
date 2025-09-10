@@ -3491,7 +3491,7 @@ string
 <tbody>
 <tr>
 <td>
-<code>size</code></br>
+<code>fileSize</code></br>
 <em>
 int
 </em>
@@ -5386,24 +5386,49 @@ InPlaceUpdatesWorkerStatus
 <tbody>
 <tr>
 <td>
-<code>size</code></br>
+<code>diskSize</code></br>
 <em>
 int
 </em>
 </td>
 <td>
-<p>Size is the size of the zram backed swap device</p>
+<p>DiskSize is the size of the zram backed swap device</p>
 </td>
 </tr>
 <tr>
 <td>
-<code>algorithm</code></br>
+<code>compAlgorithm</code></br>
 <em>
 string
 </em>
 </td>
 <td>
-<p>Algorithm specifies the compression algorithm for the zram backed swap device</p>
+<em>(Optional)</em>
+<p>CompAlgorithm specifies the compression algorithm for the zram backed swap device</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>memLimit</code></br>
+<em>
+int
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>MemLimit specifies the maximum physical memory usage for the zram device</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>maxCompStreams</code></br>
+<em>
+int
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>MaxCompStreams specifies the maximum number of compression streams for the zram device</p>
 </td>
 </tr>
 </tbody>

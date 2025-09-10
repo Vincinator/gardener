@@ -329,11 +329,11 @@ spec:
                         fileName:
                           description: FileName is the name of a swap file
                           type: string
-                        size:
+                        fileSize:
                           description: FileSize is the size of the swap file
                           type: integer
                       required:
-                      - size
+                      - fileSize
                       type: object
                     type: array
                   zramSwap:
@@ -342,16 +342,24 @@ spec:
                       description: ZramSwapConfiguration configures zram backed swap
                         on a Kubernetes worker node
                       properties:
-                        algorithm:
-                          description: Algorithm specifies the compression algorithm
+                        compAlgorithm:
+                          description: CompAlgorithm specifies the compression algorithm
                             for the zram backed swap device
                           type: string
-                        size:
-                          description: Size is the size of the zram backed swap device
+                        diskSize:
+                          description: DiskSize is the size of the zram backed swap
+                            device
+                          type: integer
+                        maxCompStreams:
+                          description: MaxCompStreams specifies the maximum number
+                            of compression streams for the zram device
+                          type: integer
+                        memLimit:
+                          description: MemLimit specifies the maximum physical memory
+                            usage for the zram device
                           type: integer
                       required:
-                      - algorithm
-                      - size
+                      - diskSize
                       type: object
                     type: array
                 type: object
