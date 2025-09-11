@@ -20,20 +20,19 @@ import (
 	"strings"
 	"time"
 
-  "golang.org/x/sys/unix"
-
 	machinev1alpha1 "github.com/gardener/machine-controller-manager/pkg/apis/machine/v1alpha1"
 	"github.com/go-logr/logr"
+	"github.com/perses/common/file"
 	"github.com/spf13/afero"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	jsonserializer "k8s.io/apimachinery/pkg/runtime/serializer/json"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
-	"k8s.io/client-go/discovery/cached/disk"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	"k8s.io/client-go/tools/record"
@@ -1099,49 +1098,130 @@ func (r *Reconciler) restartNodeAgent(oscChanges *operatingSystemConfigChanges, 
 	return reconcile.Result{RequeueAfter: RequeueAfterRestart}, nil
 }
 
-func (r *Reconciler) checkCompAlgSupport(ctx context.Context, log logr.Logger, compAlgorithm string, deviceNum int) bool {
+func (r *Reconciler) checkCompAlgSupport(ctx context.Context, log logr.Logger, compAlgorithm string, deviceNum int) (bool, error){
 
-	cmdGetSupportedAlgorithms:= exec.CommandContext(ctx, "bash", "-c", fmt.Sprintf("cat /sys/block/zram%d/disksize", deviceNum))
+	output, err := r.FS.ReadFile(fmt.Sprintf("cat /sys/block/zram%d/comp_algorithm", deviceNum))
 	
-	output, err := cmdGetSupportedAlgorithms.Output()
 	if err != nil {
 		log.Error(err,"failed to get supported compression algorithms for zram device")
-		return false
+		return false, err
+	}
+	
+	for _, alg := range(strings.Split(string(output), " ")){
+		// [alg] indicates currently selected compression algorithm by kernel, thus we need to trim accordingly
+		if strings.Trim(alg, "[]") == compAlgorithm {
+			return true, nil
+		}
 	}
 
-	return strings.Contains(string(output), compAlgorithm)
+	return false, nil
+}
+
+func (r* Reconciler) checkZRAMAlreadyEnabled(ctx context.Context, log logr.Logger) (bool, error) {
+
+	zram0Exists, err := r.FS.DirExists("/sys/block/zram0")
+	if err != nil {
+		return false, err
+	}
+
+	// exit early, no zram devices available
+	if !zram0Exists {
+		return false, nil
+	}
+
+	// check swap confiog
+	swapsContent, errProcSwaps := r.FS.ReadFile("/proc/swaps")
+	if errProcSwaps != nil {
+		return false, err
+	}
+
+	if strings.Contains(string(swapsContent), "zram") {
+		return true, nil
+	}
+
+	return false, nil	
 }
 
 func (r* Reconciler) writeSysfsConfiguration(ctx context.Context, log logr.Logger, path string, value string) error {
-	
-	cmd := exec.CommandContext(ctx, "bash", "-c", fmt.Sprintf("echo %s > %s", value, path))
+	fileInfo, err := r.FS.Stat(path)
 
-	if err := cmd.Run(); err != nil {
-		log.Error(err, "failed to write sysfs configuration", "path", path, "value", value)
+	if err != nil {
+		return err
+	}
+
+	if err := r.FS.WriteFile(path,  []byte(value),fileInfo.Mode().Perm()); err != nil {
 		return err
 	}
 
 	return nil
 }
 
+func (r* Reconciler) activateSwap(ctx context.Context, log logr.Logger, swapPath string) error {
 
-func (r *Reconciler) getPhysicalMemorySize(ctx context.Context, log logr.Logger) (uint64, error) {
-	var info unix.Sysinfo_t
-	if err := unix.Sysinfo(&info); err != nil {
-        return 0, err
-    }
-    totalRAM := info.Totalram * uint64(info.Unit) / (1024 * 1024) // Convert to MiB
-    return totalRAM, nil
+	cmdMkSwap := exec.CommandContext(ctx, "mkswap", swapPath)
+	if err :=cmdMkSwap.Run(); err != nil{
+		return err
+	}
+	
+	cmdSwapOn := exec.CommandContext(ctx, "swapon", swapPath)
+	if err := cmdSwapOn.Run(); err != nil{
+		return err
+	}
+
+	return nil
+
 }
 
+func (r *Reconciler) allocateSwapFile(ctx context.Context, log logr.Logger, swapPath string, size resource.Quantity ) error {
+
+	cmdAllocate := exec.CommandContext(ctx, "dd", "if=/dev/zero", fmt.Sprintf("of=%s", swapPath), "bs=1M", fmt.Sprintf("count=%d", size.Value()/1024/1024))
+
+	if err := cmdAllocate.Run(); err != nil {
+		return err
+	}
+
+	return nil
+
+}
 
 func (r *Reconciler) applySwapConfiguration(ctx context.Context, log logr.Logger, oscChanges *operatingSystemConfigChanges) error {
-	// for num, swapConfig := range oscChanges.SwapConfiguration.FileSwap {
-		//  e do what ever is necessary to enable file swap
-	// }
+	for num, swapConfig := range oscChanges.SwapConfiguration.FileSwap {
+	
+		fileName := fmt.Sprintf("/swapfile_%d", num)
+
+		if swapConfig.FileName != nil {
+			fileName = *swapConfig.FileName
+		}
+
+		swapExists, err :=  r.FS.Exists(fileName)
+		if err != nil {
+			return fmt.Errorf("checking swap file existence failed: %w", err)
+		}
+		if swapExists {
+			return errors.New("swap file already exists; re-configuration is not supported.")
+		}
+
+		if err := r.allocateSwapFile(ctx, log, fileName, swapConfig.FileSize); err != nil {
+			return err
+		}
+		if err := r.activateSwap(ctx, log, fileName); err != nil {
+			return err
+		}
+
+	}
 
 	// https://www.kernel.org/doc/html/latest/admin-guide/blockdev/zram.html
 	if oscChanges.SwapConfiguration.ZramSwap != nil {
+
+		zramAlreadyExists, errZRAMCheck:= r.checkZRAMAlreadyEnabled(ctx, log)
+		if errZRAMCheck != nil {
+			return errZRAMCheck
+		}
+		
+		if zramAlreadyExists {
+			return fmt.Errorf("ZRAM Swap already enabled. Re-configuration not supported.")
+		}
+
 		numDevices := len(oscChanges.SwapConfiguration.ZramSwap)
 		// load zram module via os/exec modprobe zram num_devices=
 		cmd := exec.CommandContext(ctx, "modprobe", "zram", fmt.Sprintf("num_devices=%d", numDevices))
@@ -1154,51 +1234,30 @@ func (r *Reconciler) applySwapConfiguration(ctx context.Context, log logr.Logger
 		// configure zram devices
 		for num, swapConfig := range oscChanges.SwapConfiguration.ZramSwap {
 
-			diskSize := swapConfig.DiskSizeMib
-
-			if diskSize <= 0 {
-				return errors.New("invalid disk size for zram configuration. Disk size must be greater than 0")
-			}
-			
-			totalRAM, err := r.getPhysicalMemorySize(ctx, log)
-			if err != nil {
-				return errors.New("failed to get physical memory size")
-			}
-
-			if totalRAM > uint64(diskSize) * 2 {
-				return errors.New("DiskSize of zram is too large, no point in having zram twice the size of physical memory")
-			}
+			diskSize := swapConfig.DiskSize
 
 			// Must always set disksize
 			r.writeSysfsConfiguration(ctx, log, fmt.Sprintf("/sys/block/zram%d/disksize", num), fmt.Sprintf("%dM", diskSize))
-
-			// optionally set Memory Limit for device 
-			if swapConfig.MemLimitMib != nil {
-				memLimitMib := *swapConfig.MemLimitMib
-				if memLimitMib <= 0 {
-					return errors.New("invalid memory limit for zram configuration. Memory limit must be greater than 0")
-
-				}
-				r.writeSysfsConfiguration(ctx, log, fmt.Sprintf("/sys/block/zram%d/mem_limit", num), fmt.Sprintf("%dM", memLimitMib))
-			}
 			
 			// optionally set compression algorithm
 			if swapConfig.CompAlgorithm != nil {
 				compAlgorithm := *swapConfig.CompAlgorithm
 				
-				if !r.checkCompAlgSupport(ctx, log, compAlgorithm, num) {
-					return errors.New("zram compression algorithm not supported by kernel")
+				requestedCompAlgIsSupported, errCheckCompAlgSupport := r.checkCompAlgSupport(ctx, log, compAlgorithm, num)
+				
+				if errCheckCompAlgSupport != nil {
+					return errCheckCompAlgSupport
+				} else if !requestedCompAlgIsSupported {
+					return fmt.Errorf("Requested Compression Algorithm %s is not supported", compAlgorithm)
 				}
+
 				r.writeSysfsConfiguration(ctx, log, fmt.Sprintf("/sys/block/zram%d/comp_algorithm", num), compAlgorithm)
 			}
 
-			if swapConfig.MaxCompStreams != nil {
-				maxCompStreams := *swapConfig.MaxCompStreams
-				if maxCompStreams <= 0 {
-					return errors.New("invalid max compression streams for zram configuration. Max compression streams must be greater than 0")
-				}
-				r.writeSysfsConfiguration(ctx, log, fmt.Sprintf("/sys/block/zram%d/max_comp_streams", num), fmt.Sprintf("%d", maxCompStreams))
+		  if err := r.activateSwap(ctx, log, fmt.Sprintf("/dev/zram%d", num)); err != nil{
+				return err
 			}
+
 		}
 	}
 	return nil

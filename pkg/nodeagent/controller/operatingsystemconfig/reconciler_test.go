@@ -910,6 +910,7 @@ kind: NodeAgentConfiguration
 			test.AssertFileOnDisk(fs, nodeagentconfigv1alpha1.KubeconfigFilePath, expectedNodeAgentKubeConfig, 0600)
 		})
 	})
+	// TODO: add GNA swap config tests
 })
 
 func getNodeAgentKubeConfig(caBundle []byte, server, clientCertificate string) string {

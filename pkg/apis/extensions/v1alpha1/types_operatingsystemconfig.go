@@ -8,6 +8,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 )
 
 var _ Object = (*OperatingSystemConfig)(nil)
@@ -107,8 +108,8 @@ type SwapConfiguration struct {
 
 // FileSwapConfiguration configures file backed swap on a Kubernetes worker node
 type FileSwapConfiguration struct {
-	//FileSize is the size of the swap file in Mib
-	FileSizeMib int `json:"fileSize"`
+	//FileSize is the size of the swap file in
+	FileSize resource.Quantity `json:"fileSize"`
 	//FileName is the name of a swap file
 	//+optional
 	FileName *string `json:"fileName,omitempty"`
@@ -116,17 +117,11 @@ type FileSwapConfiguration struct {
 
 // ZramSwapConfiguration configures zram backed swap on a Kubernetes worker node
 type ZramSwapConfiguration struct {
-	// DiskSizeMib is the size in Mib of the zram backed swap device
-  DiskSizeMib int `json:"diskSize"`
+	// DiskSize is the size of the zram backed swap device
+  DiskSize resource.Quantity `json:"diskSize"`
 	// CompAlgorithm specifies the compression algorithm for the zram backed swap device
 	//+optional
 	CompAlgorithm *string `json:"compAlgorithm"`
-	// MemLimit specifies the maximum physical memory usage for the zram device in Mib
-	//+optional
-	MemLimitMib *int `json:"memLimit"`
-	// MaxCompStreams specifies the maximum number of compression streams for the zram device
-	//+optional
-	MaxCompStreams *int `json:"maxCompStreams"`
 }
 
 // Unit is a unit for the operating system configuration (usually, a systemd unit).
