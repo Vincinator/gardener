@@ -3493,11 +3493,11 @@ string
 <td>
 <code>fileSize</code></br>
 <em>
-int
+k8s.io/apimachinery/pkg/api/resource.Quantity
 </em>
 </td>
 <td>
-<p>FileSize is the size of the swap file</p>
+<p>FileSize is the size of the swap file in</p>
 </td>
 </tr>
 <tr>
@@ -5388,7 +5388,7 @@ InPlaceUpdatesWorkerStatus
 <td>
 <code>diskSize</code></br>
 <em>
-int
+k8s.io/apimachinery/pkg/api/resource.Quantity
 </em>
 </td>
 <td>
@@ -5405,30 +5405,6 @@ string
 <td>
 <em>(Optional)</em>
 <p>CompAlgorithm specifies the compression algorithm for the zram backed swap device</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>memLimit</code></br>
-<em>
-int
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>MemLimit specifies the maximum physical memory usage for the zram device</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>maxCompStreams</code></br>
-<em>
-int
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>MaxCompStreams specifies the maximum number of compression streams for the zram device</p>
 </td>
 </tr>
 </tbody>
